@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29786215/README.md)
 # Lustre HPC Lab
 
 A hands-on lab for building a working [Lustre](https://www.lustre.org/) parallel filesystem across three virtual machines using VMware Workstation. The goal is to understand — end-to-end — how the MGS, MDS, OSS, and client roles fit together, and to prove that a client on one VM can read and write files stored on OSTs hosted on a different VM.

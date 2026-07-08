@@ -1,0 +1,20 @@
+# VMware virtual machine binaries and runtime state
+*.vmdk
+*.vmem
+*.vmss
+*.vmsn
+*.vmsd
+*.vmx
+*.vmxf
+*.nvram
+*.scoreboard
+*.log
+mksSandbox*.log
+vmware*.log
+client/
+mgsmds/
+oss/
+
+# Internal handoff / planning notes (not for public)
+Improve*.md
+handoff_*.md
