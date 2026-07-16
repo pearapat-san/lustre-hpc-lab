@@ -10,9 +10,7 @@ The lab currently runs a two-OST filesystem (`labfs`, ~18.4 GB usable), survives
 
 Three VMs, each with a single Lustre role. `oss` hosts two OSTs on two separate disks.
 
-```
 ![diagram](assets/lustre-diagram.png)
-```
 
 | VM       | Role              | Host-only IP     | Lustre disk(s)                     | Mount point(s)                |
 | -------- | ----------------- | ---------------- | ---------------------------------- | ----------------------------- |
