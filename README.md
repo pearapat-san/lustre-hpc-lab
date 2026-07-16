@@ -11,16 +11,7 @@ The lab currently runs a two-OST filesystem (`labfs`, ~18.4 GB usable), survives
 Three VMs, each with a single Lustre role. `oss` hosts two OSTs on two separate disks.
 
 ```
-                          Host-only network (192.168.100.0/24)
-                                       │
-        ┌──────────────────────────────┼──────────────────────────────┐
-        │                              │                              │
-  ┌───────────┐                 ┌────────────┐                ┌────────────┐
-  │  mgsmds   │                 │    oss     │                │   client   │
-  │ MGS + MDS │◀──── config ────│  OST0 sdb  │                │  mounts    │
-  │  MDT/sdb  │                 │  OST1 sdc  │                │ /mnt/labfs │
-  │ .100.10   │                 │  .100.11   │                │  .100.12   │
-  └───────────┘                 └────────────┘                └────────────┘
+![diagram](assets/lustre-diagram.png)
 ```
 
 | VM       | Role              | Host-only IP     | Lustre disk(s)                     | Mount point(s)                |
