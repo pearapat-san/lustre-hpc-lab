@@ -1,3 +1,4 @@
+[README_v2.md](https://github.com/user-attachments/files/30072084/README_v2.md)
 # Lustre HPC Lab
 
 A hands-on lab for building a working [Lustre](https://www.lustre.org/) parallel filesystem across three virtual machines using VMware Workstation. The goal is to understand — end-to-end — how the MGS, MDS, OSS, and client roles fit together, and to prove that a client on one VM can read and write files stored on OSTs hosted on a different VM.
@@ -140,9 +141,51 @@ If you would rather understand each step (or you are running from a clean instal
 - Client mounts `labfs` and can read/write files across the network
 - All three VMs use persistent, UUID-based `/etc/fstab` entries and come back cleanly from a cold reboot (boot order: `mgsmds` → `oss` → `client`)
 - File striping across both OSTs verified: `lfs setstripe -c 2` produces `lmm_stripe_count: 2` with objects on both `obdidx` 0 and 1
-- Baseline write throughput (single 1 GB `dd` with `oflag=direct`): **71.4 MB/s** on 2× OST, recorded on 2026-07-08
+- Parallel write throughput scales with OST count: two concurrent 1 GB writes reach ~217 MB/s aggregate across 2 OSTs vs ~129 MB/s sequentially on one (about 1.68x faster). See [Performance](#performance)
 
 `lfs df -h` from the client reports **~18.4 GB** usable, backed by 1 MDT + 2 OSTs.
+
+---
+
+## Performance
+
+All throughput tests run from `client` with `dd ... oflag=direct`, which bypasses the page cache so the numbers reflect real network and disk throughput rather than RAM caching. Aggregate throughput is total data written divided by wall-clock time.
+
+### Sequential vs parallel writes
+
+Writing two 1 GB files, first one after another on a single OST, then concurrently across both OSTs:
+
+![Sequential vs parallel throughput](assets/throughput-seq-vs-parallel.png)
+
+| Layout             | Wall-clock time | Aggregate throughput |
+| ------------------ | --------------- | -------------------- |
+| Sequential (1 OST) | 15.5 s          | 129 MB/s             |
+| Parallel (2 OST)   | 9.2 s           | 217 MB/s             |
+
+Writing across both OSTs in parallel is about 1.68x faster. A single-stream write only engages one OST at a time, leaving the second idle; running two concurrent streams lets both OSTs work at once.
+
+### Scaling with file size
+
+Repeating the comparison across 1, 2, 3, and 4 GB files (each side writes two files of the given size):
+
+![Parallel I/O scaling by file size](assets/parallel-io-scaling.png)
+
+| File size | Sequential (1 OST) | Parallel (2 OST) | Speedup |
+| --------- | ------------------ | ---------------- | ------- |
+| 1 GB      | 61.5 MB/s          | 139.2 MB/s       | 2.26x   |
+| 2 GB      | 118.5 MB/s         | 203.1 MB/s       | 1.71x   |
+| 3 GB      | 131.1 MB/s         | 193.3 MB/s       | 1.47x   |
+| 4 GB      | 131.6 MB/s         | 211.4 MB/s       | 1.61x   |
+
+The 1 GB sequential figure is low because of first-run warm-up. From 2 GB on, sequential settles around 120 to 132 MB/s and parallel around 190 to 211 MB/s.
+
+The parallel advantage (parallel minus sequential) stays roughly constant at about 76 MB/s regardless of file size:
+
+![Throughput gained by writing across 2 OSTs](assets/parallel-advantage.png)
+
+Takeaway: aggregate throughput scales with OST count. Each added OST contributes a fixed slab of write bandwidth, which is the core reason parallel filesystems power HPC.
+
+> Test note: each OST is only ~9.2 GB, so the sequential run (which writes twice the file size onto a single OST) caps at 4 GB. Larger sweeps need bigger OSTs.
 
 ---
 
@@ -181,6 +224,7 @@ Common symptoms and where to look:
 | Reboot succeeds but nothing mounts                         | Missing `_netdev` in `/etc/fstab`, or `systemctl daemon-reload` was skipped after editing fstab.                    |
 | `mount.lustre: /dev/sdX has not been formatted with mkfs.lustre` | Kernel re-numbered your disks. Compare current `blkid` output to your stored UUIDs, then switch fstab to `UUID=`. This bit us on `mgsmds` — the MDT flipped from `/dev/sda` to `/dev/sdb` between reboots. |
 | `blkid` reports `TYPE="ext4"` on a Lustre target           | Expected — the `ldiskfs` backend is ext4-based. Check `LABEL` instead (e.g., `labfs-OST0000`).                       |
+| `lfs setstripe: Inappropriate ioctl for device`, and writes suddenly ~10x faster | `/mnt/labfs` is not actually mounted as Lustre, so writes land on the client's local disk. Check `lfs df -h` and `mount \| grep lustre`, then re-mount: `mount -t lustre mgsmds@tcp0:/labfs /mnt/labfs`. |
 
 ---
 
@@ -191,6 +235,7 @@ Common symptoms and where to look:
 - [x] Automation scripts for repeatable bring-up (`setup_mgsmds.sh`, `setup_oss.sh`, `setup_client.sh`)
 - [x] Multiple OSTs for scale-out testing (`labfs` now runs on 2 OSTs)
 - [x] Baseline single-client throughput recorded (71.4 MB/s)
+- [x] Parallel write scaling measured (1 vs 2 OST across 1 to 4 GB files)
 - [ ] Failover / HA scenarios (needs shared storage — deferred)
 - [ ] Broader performance testing (`ost-survey`, `sgpdd-survey`, large-file and concurrent workloads)
 - [ ] Auto-detect OST index from label in `setup_oss.sh` (currently manual via `OST_INDEX` in the CONFIG block)
@@ -205,6 +250,7 @@ Common symptoms and where to look:
 ├── setup_mgsmds.sh        # bring-up script for the MGS/MDS node
 ├── setup_oss.sh           # bring-up script for the OSS node
 ├── setup_client.sh        # bring-up script for the client node
+├── assets/                # diagram and performance charts used in this README
 ├── client/                # VMware VM (not tracked — see .gitignore)
 ├── mgsmds/                # VMware VM (not tracked — see .gitignore)
 └── oss/                   # VMware VM (not tracked — see .gitignore)
