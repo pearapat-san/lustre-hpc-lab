@@ -101,7 +101,45 @@ If you would rather understand each step (or you are running from a clean instal
 1. **Provision VMs.** Install Rocky 9.4 Minimal on all three; only touch the 20 GB OS disk during install.
 2. **Configure the network.** Static IPs on `ens160`, `/etc/hosts` on every VM, disable `firewalld` + SELinux.
 3. **Install Lustre server.** On `mgsmds` and `oss`, install the patched kernel and Lustre server RPMs from Whamcloud (`el9.4/server/`), then reboot into the patched kernel.
+   ```bash
+   # add Whamcloud server + e2fsprogs repos
+   cat >/etc/yum.repos.d/lustre.repo <<'EOF'
+   [lustre-server]
+   name=lustre-server
+   baseurl=https://downloads.whamcloud.com/public/lustre/latest-release/el9.4/server/
+   gpgcheck=0
+   [e2fsprogs-wc]
+   name=e2fsprogs-wc
+   baseurl=https://downloads.whamcloud.com/public/e2fsprogs/latest/el9/
+   gpgcheck=0
+   EOF
+
+   # install patched kernel + ldiskfs server RPMs
+   dnf --nogpgcheck -y install \
+     kernel kernel-devel kernel-headers \
+     lustre kmod-lustre kmod-lustre-osd-ldiskfs lustre-osd-ldiskfs-mount \
+     e2fsprogs
+
+   # boot the patched kernel
+   grubby --set-default "$(ls /boot/vmlinuz-*_lustre* | head -1)"
+   reboot
+   ```
 4. **Install Lustre client.** On `client`, install client RPMs from Whamcloud (`el9.4/client/`) — no patched kernel needed.
+   ```bash
+   # add Whamcloud client repo
+   cat >/etc/yum.repos.d/lustre-client.repo <<'EOF'
+   [lustre-client]
+   name=lustre-client
+   baseurl=https://downloads.whamcloud.com/public/lustre/latest-release/el9.4/client/
+   gpgcheck=0
+   EOF
+
+   # install patchless client RPMs (no kernel/reboot)
+   dnf --nogpgcheck -y install lustre-client kmod-lustre-client
+
+   # load + verify
+   modprobe lustre && lsmod | grep lustre
+   ```
 5. **Format + mount MDT** on `mgsmds`:
    ```bash
    lsblk   # confirm the empty 10 GB disk
